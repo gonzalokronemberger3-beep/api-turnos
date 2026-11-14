@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: api-turnos
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/salud
+    envVars:
+      - key: NODE_VERSION
+        value: 24.11.0
+      - key: SEED_DEMO
+        value: "true"

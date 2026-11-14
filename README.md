@@ -125,3 +125,29 @@ test/
 scripts/
   demo.js             carga datos de ejemplo
 ```
+
+---
+
+## Deploy
+
+La app está preparada para correr en un hosting que inyecte `PORT`:
+
+| Variable | Para qué | Por defecto |
+|---|---|---|
+| `PORT` | Lo asigna el hosting | `3000` |
+| `DB` | Ruta del archivo SQLite | `data/turnos.db` |
+| `SEED_DEMO` | Carga 4 turnos si la base está vacía | `true` |
+
+El `render.yaml` incluido despliega en [Render](https://render.com) con el plan gratis:
+
+1. Subir el repo a GitHub.
+2. En Render: **New → Blueprint**, elegir el repo. Detecta `render.yaml` solo.
+3. Cuando termina el build, abrir la URL y verificar `/api/salud`.
+
+**Cosas que hay que saber del plan gratis:**
+
+- **El disco es efímero.** Cada deploy o reinicio borra `data/turnos.db`. Por eso `SEED_DEMO` vuelve a cargar los 4 turnos de ejemplo: sin eso, el que abre el link encuentra una pantalla vacía y cree que está roto. En producción real esto se resuelve con un disco persistente (pago) o Postgres.
+- **Duerme a los 15 minutos sin tráfico.** La primera visita después tarda 30-50 segundos. Si molesta, se puede pingear `/api/salud` cada 10 minutos con un cron externo (cron-job.org).
+- **Una sola instancia.** Render no escala horizontal en el plan gratis, y eso acá es una ventaja: SQLite con varias instancias daría datos inconsistentes porque cada una tendría su propio archivo.
+
+**Tip:** no uses Vercel para esto. Serverless levanta varias instancias y cada una con su SQLite: el turno que creaste en una no aparece en la otra.
