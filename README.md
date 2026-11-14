@@ -147,6 +147,8 @@ El `render.yaml` incluido despliega en [Render](https://render.com) con el plan 
 2. En Render: **New → Blueprint**, elegir el repo. Detecta `render.yaml` solo.
 3. Cuando termina el build, abrir la URL y verificar `/api/salud`.
 
+**Si cargás el repo por URL pública** (sin conectar la cuenta de GitHub), Render no recibe el webhook de los `push`: hay que entrar al servicio y usar **Manual Deploy → Deploy latest commit** después de cada cambio. Conectando la cuenta de GitHub en su lugar, el deploy pasa a ser automático.
+
 **Cosas que hay que saber del plan gratis:**
 
 - **El disco es efímero.** Cada deploy o reinicio borra `data/turnos.db`. Por eso `SEED_DEMO` vuelve a cargar los 4 turnos de ejemplo: sin eso, el que abre el link encuentra una pantalla vacía y cree que está roto. En producción real esto se resuelve con un disco persistente (pago) o Postgres.
