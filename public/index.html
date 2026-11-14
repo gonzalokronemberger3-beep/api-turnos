@@ -81,6 +81,8 @@ const $ = (id) => document.getElementById(id);
 const iso = (d) => d.toISOString();
 const soloFecha = (d) => [d.getFullYear(), String(d.getMonth()+1).padStart(2,"0"), String(d.getDate()).padStart(2,"0")].join("-");
 
+let primeraCarga = true;
+
 function hoy() { const d = new Date(); $("fecha").value = soloFecha(d); $("verFecha").value = soloFecha(d); }
 
 function pintarError(msj) { $("error").textContent = msj || ""; }
@@ -95,6 +97,19 @@ async function cargar() {
   const res = await fetch(`/api/turnos?desde=${desde}&hasta=${hasta}&limite=200`);
   const { turnos } = await res.json();
   const cont = $("lista");
+
+  // Primera carga y el día de hoy está vacío: saltar al próximo turno.
+  // Así el que abre la demo no ve una pantalla vacía y cree que está rota.
+  if (!turnos.length && primeraCarga) {
+    primeraCarga = false;
+    const fin = iso(new Date(a, m-1, d + 30));
+    const siguiente = await (await fetch(`/api/turnos?desde=${desde}&hasta=${fin}&limite=1`)).json();
+    if (siguiente.turnos.length) {
+      $("verFecha").value = soloFecha(new Date(siguiente.turnos[0].inicio));
+      return cargar();
+    }
+  }
+  primeraCarga = false;
 
   if (!turnos.length) { cont.innerHTML = '<div class="vacio">Sin turnos para ese día.</div>'; return; }
 
