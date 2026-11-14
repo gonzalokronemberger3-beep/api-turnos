@@ -4,6 +4,9 @@ API REST para que un negocio chico (peluquería, consultorio, cancha, taller) ge
 
 Incluye una interfaz web mínima para probarla sin Postman.
 
+**Demo en vivo:** <https://api-turnos-0axl.onrender.com> — se puede usar sin instalar nada.
+El plan gratis duerme tras 15 minutos sin visitas; la primera carga puede tardar ~50 segundos.
+
 **Stack:** Node 24 · Express 5 · SQLite (`node:sqlite`, sin dependencias nativas) · `node:test`
 
 ---
