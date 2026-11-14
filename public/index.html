@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turnos</title>
+<style>
+  :root { --fondo:#0f1115; --panel:#171a21; --borde:#272b36; --texto:#e6e8ee; --suave:#9aa3b2; --acento:#4f8cff; --ok:#3fb950; --mal:#f85149; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px 20px; background:var(--fondo); color:var(--texto);
+         font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width:840px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  p.sub { color:var(--suave); margin:0 0 28px; font-size:13px; }
+  .panel { background:var(--panel); border:1px solid var(--borde); border-radius:10px; padding:18px; margin-bottom:20px; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--suave); margin:0 0 14px; font-weight:600; }
+  .grilla { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+  label { display:block; font-size:12px; color:var(--suave); margin-bottom:4px; }
+  input, select { width:100%; padding:9px 10px; background:#0b0d11; color:var(--texto);
+                  border:1px solid var(--borde); border-radius:7px; font:inherit; font-size:14px; }
+  input:focus, select:focus { outline:none; border-color:var(--acento); }
+  button { margin-top:14px; padding:9px 16px; border-radius:7px; border:1px solid transparent;
+           background:var(--acento); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  button:hover { filter:brightness(1.1); }
+  button.sec { background:transparent; border-color:var(--borde); color:var(--suave); font-weight:400; margin:0; padding:5px 10px; font-size:12px; }
+  button.sec:hover { color:var(--texto); }
+  button.sec.peligro:hover { color:var(--mal); border-color:var(--mal); }
+  .fila { display:flex; justify-content:space-between; align-items:center; gap:12px;
+          padding:11px 0; border-bottom:1px solid var(--borde); }
+  .fila:last-child { border-bottom:none; }
+  .hora { font-variant-numeric:tabular-nums; font-weight:600; min-width:56px; }
+  .datos { flex:1; }
+  .datos small { color:var(--suave); display:block; font-size:12px; }
+  .estado { font-size:11px; padding:2px 8px; border-radius:20px; border:1px solid var(--borde); color:var(--suave); }
+  .estado.confirmado { color:var(--ok); border-color:var(--ok); }
+  .estado.cancelado { color:var(--mal); border-color:var(--mal); text-decoration:line-through; }
+  .vacio { color:var(--suave); font-size:13px; padding:10px 0; }
+  .error { color:var(--mal); font-size:13px; margin-top:10px; min-height:18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Turnos</h1>
+  <p class="sub">Demo de la API · los datos se guardan en SQLite local</p>
+
+  <section class="panel">
+    <h2>Nuevo turno</h2>
+    <form id="form">
+      <div class="grilla">
+        <div><label for="cliente">Cliente</label><input id="cliente" required minlength="2" maxlength="80"></div>
+        <div><label for="telefono">Teléfono</label><input id="telefono" maxlength="25" placeholder="+54 11 ..."></div>
+        <div><label for="servicio">Servicio</label><input id="servicio" required minlength="2" maxlength="80"></div>
+        <div><label for="fecha">Fecha</label><input id="fecha" type="date" required></div>
+        <div><label for="hora">Hora</label><input id="hora" type="time" required step="900"></div>
+        <div><label for="duracion">Duración</label>
+          <select id="duracion">
+            <option value="15">15 min</option>
+            <option value="30" selected>30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">60 min</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit">Agendar</button>
+      <div class="error" id="error"></div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Agenda del día</h2>
+    <div class="grilla" style="grid-template-columns:1fr auto">
+      <div><label for="verFecha">Fecha</label><input id="verFecha" type="date"></div>
+      <div style="display:flex;align-items:flex-end"><button class="sec" id="refrescar">Actualizar</button></div>
+    </div>
+    <div id="lista" style="margin-top:16px"></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const iso = (d) => d.toISOString();
+const soloFecha = (d) => [d.getFullYear(), String(d.getMonth()+1).padStart(2,"0"), String(d.getDate()).padStart(2,"0")].join("-");
+
+function hoy() { const d = new Date(); $("fecha").value = soloFecha(d); $("verFecha").value = soloFecha(d); }
+
+function pintarError(msj) { $("error").textContent = msj || ""; }
+
+async function cargar() {
+  const f = $("verFecha").value;
+  if (!f) return;
+  const [a,m,d] = f.split("-").map(Number);
+  const desde = iso(new Date(a, m-1, d, 0, 0, 0, 0));
+  const hasta = iso(new Date(a, m-1, d+1, 0, 0, 0, 0));
+
+  const res = await fetch(`/api/turnos?desde=${desde}&hasta=${hasta}&limite=200`);
+  const { turnos } = await res.json();
+  const cont = $("lista");
+
+  if (!turnos.length) { cont.innerHTML = '<div class="vacio">Sin turnos para ese día.</div>'; return; }
+
+  cont.innerHTML = turnos.map(t => {
+    const i = new Date(t.inicio);
+    const hh = String(i.getHours()).padStart(2,"0") + ":" + String(i.getMinutes()).padStart(2,"0");
+    return `<div class="fila">
+      <div class="hora">${hh}</div>
+      <div class="datos">${esc(t.cliente)}<small>${esc(t.servicio)} · ${esc(t.telefono || "sin teléfono")}</small></div>
+      <span class="estado ${t.estado}">${t.estado}</span>
+      ${t.estado === "cancelado" ? "" : `<button class="sec" data-cancelar="${t.id}">cancelar</button>`}
+      <button class="sec peligro" data-borrar="${t.id}">borrar</button>
+    </div>`;
+  }).join("");
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  pintarError("");
+  const [a,m,d] = $("fecha").value.split("-").map(Number);
+  const [h,min] = $("hora").value.split(":").map(Number);
+
+  const cuerpo = {
+    cliente: $("cliente").value,
+    telefono: $("telefono").value || null,
+    servicio: $("servicio").value,
+    inicio: iso(new Date(a, m-1, d, h, min, 0, 0)),
+    duracion_min: Number($("duracion").value),
+  };
+
+  const res = await fetch("/api/turnos", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(cuerpo),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    pintarError(err.error === "turno_superpuesto"
+      ? "Ese horario ya está ocupado."
+      : (err.detalles || []).map(d => `${d.campo}: ${d.mensaje}`).join(" · ") || "No se pudo crear.");
+    return;
+  }
+
+  $("form").reset();
+  hoy();
+  await cargar();
+});
+
+$("lista").addEventListener("click", async (e) => {
+  const cancelar = e.target.dataset.cancelar;
+  const borrar = e.target.dataset.borrar;
+
+  if (cancelar) {
+    await fetch(`/api/turnos/${cancelar}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ estado: "cancelado" }),
+    });
+    return cargar();
+  }
+
+  if (borrar) {
+    await fetch(`/api/turnos/${borrar}`, { method: "DELETE" });
+    return cargar();
+  }
+});
+
+$("refrescar").addEventListener("click", cargar);
+$("verFecha").addEventListener("change", cargar);
+
+hoy();
+cargar();
+</script>
+</body>
+</html>
